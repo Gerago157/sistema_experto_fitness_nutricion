@@ -1,5 +1,6 @@
 # engine/rules.py El motor implementa las +20 reglas lógicas requeridas, usando encadenamiento hacia adelante, saliencia, exlusión de ejercicios y bloqueo preventivo de seguridad
 
+
 from experta import KnowledgeEngine, Rule, MATCH, NOT, AS, TEST, P
 from .facts import (
     Usuario, RestriccionSalud, RestriccionNutricional, EvaluacionFisica,
@@ -39,7 +40,6 @@ class MotorFitnessNutricion(KnowledgeEngine):
 
     # =========================================================================
     # NIVEL 1: DIAGNÓSTICO FÍSICO Y BIOMECÁNICO (Saliencia 90)
-    # Genera hechos derivados de las entradas base
     # =========================================================================
     @Rule(Usuario(edad=MATCH.e, actividad=MATCH.act), TEST(lambda e, act: e < 40 and act in ['moderado', 'fuerte']), salience=90)
     def r03_diag_recuperacion_alta(self, e, act):
@@ -63,7 +63,6 @@ class MotorFitnessNutricion(KnowledgeEngine):
 
     # =========================================================================
     # NIVEL 2: DEFINICIÓN DE ESTRATEGIA (Saliencia 70)
-    # Encadenamiento a partir de EvaluacionFisica y Usuario
     # =========================================================================
     @Rule(Usuario(experiencia='principiante'), EvaluacionFisica(capacidad_recuperacion='baja'), NOT(AlertaSeguridad()), salience=70)
     def r07_estr_principiante_baja(self):
@@ -75,15 +74,20 @@ class MotorFitnessNutricion(KnowledgeEngine):
         self.declare(EsquemaBase(tipo='Fullbody', volumen='moderado'))
         self.declare(Justificacion(regla="R08", motivo="Esquema base Fullbody estándar para adaptación neuromuscular."))
 
-    @Rule(Usuario(experiencia='intermedio', objetivo='hipertrofia'), NOT(AlertaSeguridad()), salience=70)
-    def r09_estr_intermedio_hipertrofia(self):
+    @Rule(Usuario(experiencia='intermedio'), NOT(AlertaSeguridad()), salience=70)
+    def r09_estr_intermedio(self):
         self.declare(EsquemaBase(tipo='Torso/Pierna', volumen='moderado'))
-        self.declare(Justificacion(regla="R09", motivo="Esquema Torso/Pierna asignado por experiencia intermedia y objetivo de masa muscular."))
+        self.declare(Justificacion(regla="R09", motivo="Esquema Torso/Pierna asignado por experiencia intermedia."))
 
-    @Rule(Usuario(experiencia='avanzado', objetivo='hipertrofia', dias_disponibles=MATCH.d), TEST(lambda d: d >= 4), NOT(AlertaSeguridad()), salience=70)
-    def r10_estr_avanzado_hipertrofia(self, d):
+    @Rule(Usuario(experiencia='avanzado', dias_disponibles=MATCH.d), TEST(lambda d: d >= 4), NOT(AlertaSeguridad()), salience=70)
+    def r10_estr_avanzado_alta_frecuencia(self, d):
         self.declare(EsquemaBase(tipo='Push/Pull/Legs', volumen='alto'))
-        self.declare(Justificacion(regla="R10", motivo="Esquema avanzado dividido (Push/Pull/Legs) para maximizar volumen tolerado."))
+        self.declare(Justificacion(regla="R10", motivo="Esquema avanzado dividido (Push/Pull/Legs) para maximizar volumen tolerado con 4+ días."))
+
+    @Rule(Usuario(experiencia='avanzado', dias_disponibles=MATCH.d), TEST(lambda d: d < 4), NOT(AlertaSeguridad()), salience=70)
+    def r10b_estr_avanzado_baja_frecuencia(self, d):
+        self.declare(EsquemaBase(tipo='Torso/Pierna', volumen='alto'))
+        self.declare(Justificacion(regla="R10b", motivo="Esquema avanzado compactado (Torso/Pierna) adaptado a menos de 4 días disponibles."))
 
     @Rule(Usuario(objetivo='perdidagrasa'), NOT(AlertaSeguridad()), salience=70)
     def r11_estr_nut_deficit(self):
@@ -95,9 +99,13 @@ class MotorFitnessNutricion(KnowledgeEngine):
         self.declare(EstrategiaNutricional(enfoque='superavit_hipercalorico'))
         self.declare(Justificacion(regla="R12", motivo="Estrategia nutricional seteada en superávit para síntesis muscular."))
 
+    @Rule(Usuario(objetivo=MATCH.obj), TEST(lambda obj: obj in ['fuerza', 'mantenimiento']), NOT(AlertaSeguridad()), salience=70)
+    def r12b_estr_nut_mantenimiento(self, obj):
+        self.declare(EstrategiaNutricional(enfoque='mantenimiento_calorico'))
+        self.declare(Justificacion(regla="R12b", motivo="Estrategia nutricional seteada en normocalórica para fuerza o mantenimiento."))
+
     # =========================================================================
     # NIVEL 3: PRESCRIPCIÓN FINAL ENTRENAMIENTO Y EXCLUSIONES (Saliencia 50)
-    # Encadenamiento a partir de EsquemaBase y PerfilBiomecanico
     # =========================================================================
     @Rule(EsquemaBase(tipo='Fullbody', volumen='bajo_adaptativo'), NOT(AlertaSeguridad()), salience=50)
     def r13_pres_fb_bajo(self):
@@ -127,7 +135,6 @@ class MotorFitnessNutricion(KnowledgeEngine):
 
     # =========================================================================
     # NIVEL 3: PRESCRIPCIÓN FINAL NUTRICIONAL (Saliencia 50)
-    # Encadenamiento a partir de EstrategiaNutricional y Restricciones
     # =========================================================================
     @Rule(EstrategiaNutricional(enfoque='deficit_hipocalorico'), RestriccionNutricional(tipo='vegetarianismo'), NOT(AlertaSeguridad()), salience=50)
     def r19_pres_nut_deficit_veg(self):
@@ -143,3 +150,13 @@ class MotorFitnessNutricion(KnowledgeEngine):
     def r21_pres_nut_deficit_std(self):
         self.declare(PrescripcionNutricional(pauta="Priorizar proteína magra (pollo, huevos, pescados) y vegetales fibrosos. Reducir carbohidratos en comidas alejadas del entrenamiento."))
         self.declare(Justificacion(regla="R21", motivo="Recomendación estándar de déficit para optimizar saciedad y rendimiento."))
+
+    @Rule(EstrategiaNutricional(enfoque='superavit_hipercalorico'), NOT(RestriccionNutricional()), NOT(AlertaSeguridad()), salience=50)
+    def r22_pres_nut_sup_std(self):
+        self.declare(PrescripcionNutricional(pauta="Superávit estándar: Aumentar la ingesta de carbohidratos complejos (avena, arroz, pasta) alrededor del entrenamiento para maximizar el rendimiento y la recuperación."))
+        self.declare(Justificacion(regla="R22", motivo="Recomendación estándar de superávit para apoyar el crecimiento muscular."))
+
+    @Rule(EstrategiaNutricional(enfoque='mantenimiento_calorico'), NOT(AlertaSeguridad()), salience=50)
+    def r23_pres_nut_mant_std(self):
+        self.declare(PrescripcionNutricional(pauta="Mantenimiento calórico: Balancear macronutrientes asegurando un aporte proteico adecuado para sostener la masa muscular y el nivel de fuerza."))
+        self.declare(Justificacion(regla="R23", motivo="Recomendación de mantenimiento enfocada en sostener el rendimiento y la composición corporal actual."))

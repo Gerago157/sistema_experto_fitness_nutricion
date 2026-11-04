@@ -1,6 +1,15 @@
 #Interfaz, La aplicación web toma las entradas, evalúa el motor de inferencia y despliega las conclusiones junto con la traza de inferencia explicativa
 
 # app.py
+
+import collections
+import collections.abc
+
+# Parche de compatibilidad para la librería Experta en Python 3.10+
+for nombre in ["Mapping", "MutableMapping", "Iterable", "Sequence"]:
+    if not hasattr(collections, nombre):
+        setattr(collections, nombre, getattr(collections.abc, nombre))
+
 import streamlit as st
 import pandas as pd
 from engine.facts import Usuario, RestriccionSalud, RestriccionNutricional
@@ -57,6 +66,7 @@ if st.button("🚀 Generar Plan Personalizado"):
     # Declarar hechos iniciales
     engine.declare(Usuario(
         edad=edad, peso=peso, altura=altura, sexo=sexo,
+        actividad=actividad,  # Variable agregada para que el motor evalúe correctamente
         experiencia=experiencia, objetivo=objetivo, dias_disponibles=dias
     ))
     
