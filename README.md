@@ -3,8 +3,8 @@
 **Materia:** Análisis de Datos II  
 **Universidad de la Ciudad de Buenos Aires - 2026**
 
-* **Grupo Autor (Proveedor):** [Letra de tu Grupo]
-* **Grupo Cliente:** [Letra del Grupo par]
+* **Grupo Autor (Proveedor):** G
+* **Grupo Cliente:** H
 
 ---
 
