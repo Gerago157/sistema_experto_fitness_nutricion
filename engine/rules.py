@@ -2,14 +2,15 @@
 
 from experta import KnowledgeEngine, Rule, MATCH, NOT, AS, TEST, P
 from .facts import (
-    Usuario, RestriccionSalud, RestriccionNutricional, MetaMetabolica,
+    Usuario, RestriccionSalud, RestriccionNutricional, EvaluacionFisica,
+    PerfilBiomecanico, EsquemaBase, EstrategiaNutricional,
     PrescripcionEntrenamiento, PrescripcionNutricional, AlertaSeguridad, Justificacion
 )
 
 class MotorFitnessNutricion(KnowledgeEngine):
 
     # =========================================================================
-    # REGLAS DE SEGURIDAD Y BLOQUEO PREVENTIVO (Saliencia Alta = 100)
+    # REGLAS DE SEGURIDAD (Saliencia 100)
     # =========================================================================
     @Rule(
         Usuario(objetivo='fuerza', edad=MATCH.e),
@@ -17,124 +18,128 @@ class MotorFitnessNutricion(KnowledgeEngine):
         TEST(lambda e: e > 60),
         salience=100
     )
-    def regla_bloqueo_fuerza_lumbar(self):
-        """RF-06 / Criterio 5: Bloqueo preventivo de seguridad."""
+    def r01_bloqueo_fuerza_lumbar(self):
         self.declare(AlertaSeguridad(
             tipo='bloqueo_preventivo',
-            mensaje="Incompatibilidad detectada: Se ha seleccionado entrenamiento de fuerza máxima o levantamiento pesado "
-                    "teniendo una lesión lumbar grave declarada a su edad. Se suspende la prescripción automatizada por seguridad clínica."
+            mensaje="Riesgo clínico: Lesión lumbar grave y objetivo de fuerza máxima en edad avanzada."
         ))
-        self.declare(Justificacion(
-            regla="R_SEG_01",
-            motivo="Bloqueo preventivo activado por alto riesgo biomecánico entre lesión lumbar grave y objetivo de alta carga."
-        ))
-
-    # =========================================================================
-    # REGLAS DE FILTRADO Y EXCLUSIÓN BIOMECÁNICA (Saliencia = 50)
-    # =========================================================================
-    @Rule(
-        RestriccionSalud(tipo='dolor_lumbar'),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=50
-    )
-    def regla_excluir_ejercicios_lumbares(self):
-        """RF-02 / RF-08: Exclusión estrita y reemplazo de ejercicios lesivos."""
-        self.declare(PrescripcionEntrenamiento(
-            ejercicio_excluido="Sentadilla Libre con Barra",
-            ejercicio_reemplazo="Prensa 45° o Sentadilla Goblet asistida"
-        ))
-        self.declare(PrescripcionEntrenamiento(
-            ejercicio_excluido="Peso Muerto Convencional",
-            ejercicio_reemplazo="Hip Thrust / Curva Femoral en Máquina"
-        ))
-        self.declare(Justificacion(
-            regla="R_EXCL_LUMBAR",
-            motivo="Sustitución de cargas axiales compresivas en columna por molestias lumbares declaradas."
-        ))
+        self.declare(Justificacion(regla="R01", motivo="Bloqueo preventivo por riesgo biomecánico extremo."))
 
     @Rule(
-        RestriccionSalud(tipo='molestia_hombro'),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=50
+        Usuario(experiencia='principiante'),
+        RestriccionSalud(tipo='lesion_lumbar_grave'),
+        salience=100
     )
-    def regla_excluir_ejercicios_hombro(self):
-        self.declare(PrescripcionEntrenamiento(
-            ejercicio_excluido="Press Militar Trasnuca",
-            ejercicio_reemplazo="Press Militar con Mancuernas en Agarre Neutro"
+    def r02_bloqueo_principiante_lesionado(self):
+        self.declare(AlertaSeguridad(
+            tipo='bloqueo_preventivo',
+            mensaje="Derivación médica obligatoria: Principiante con diagnóstico lumbar grave requiere kinesiólogo."
         ))
-        self.declare(Justificacion(
-            regla="R_EXCL_HOMBRO",
-            motivo="Eliminación de rangos articuladores en rotación externa comprometida para proteger manguito rotador."
-        ))
+        self.declare(Justificacion(regla="R02", motivo="Protección al usuario sin experiencia motriz con lesiones graves."))
 
     # =========================================================================
-    # REGLAS DE ESTRUCTURACIÓN DE RUTINA Y VOLUMEN (Saliencia = 10)
+    # NIVEL 1: DIAGNÓSTICO FÍSICO Y BIOMECÁNICO (Saliencia 90)
+    # Genera hechos derivados de las entradas base
     # =========================================================================
-    @Rule(
-        Usuario(experiencia='principiante', dias_disponibles=MATCH.d),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=10
-    )
-    def regla_esquema_principiante(self, d):
-        esquema = "Fullbody (Cuerpo Completo)" if d <= 3 else "Torso / Pierna"
-        self.declare(PrescripcionEntrenamiento(
-            esquema=esquema,
-            series_por_grupo="2 a 3 series",
-            repeticiones="10 a 12 reps",
-            descanso="90 segundos"
-        ))
-        self.declare(Justificacion(
-            regla="R_ESTRUCT_PRINCIPIANTE",
-            motivo=f"Para nivel principiante con {d} días se prioriza la frecuencia y adaptación neuromuscular."
-        ))
+    @Rule(Usuario(edad=MATCH.e, actividad=MATCH.act), TEST(lambda e, act: e < 40 and act in ['moderado', 'fuerte']), salience=90)
+    def r03_diag_recuperacion_alta(self, e, act):
+        self.declare(EvaluacionFisica(capacidad_recuperacion='alta'))
+        self.declare(Justificacion(regla="R03", motivo="Capacidad de recuperación alta inferida por edad menor a 40 y vida activa."))
 
-    @Rule(
-        Usuario(experiencia='avanzado', objetivo='hipertrofia', dias_disponibles=MATCH.d),
-        TEST(lambda d: d >= 4),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=10
-    )
-    def regla_esquema_avanzado_hipertrofia(self, d):
-        self.declare(PrescripcionEntrenamiento(
-            esquema="Push / Pull / Legs (Empuje / Tirón / Pierna)",
-            series_por_grupo="3 a 4 series",
-            repeticiones="6 a 10 reps",
-            descanso="120 segundos"
-        ))
-        self.declare(Justificacion(
-            regla="R_ESTRUCT_AVANZADO",
-            motivo="Para nivel avanzado orientado a hipertrofia se requiere alto volumen focalizado por grupo muscular."
-        ))
+    @Rule(Usuario(edad=MATCH.e, actividad=MATCH.act), TEST(lambda e, act: e >= 40 or act == 'sedentario'), salience=90)
+    def r04_diag_recuperacion_baja(self, e, act):
+        self.declare(EvaluacionFisica(capacidad_recuperacion='baja'))
+        self.declare(Justificacion(regla="R04", motivo="Capacidad de recuperación adaptada (baja/moderada) inferida por edad o sedentarismo."))
+
+    @Rule(RestriccionSalud(tipo='dolor_lumbar') | RestriccionSalud(tipo='lesion_lumbar_grave'), salience=90)
+    def r05_diag_biomec_axial(self):
+        self.declare(PerfilBiomecanico(restriccion_axial=True))
+        self.declare(Justificacion(regla="R05", motivo="Se establece perfil de restricción axial por antecedentes lumbares."))
+
+    @Rule(RestriccionSalud(tipo='molestia_hombro'), salience=90)
+    def r06_diag_biomec_overhead(self):
+        self.declare(PerfilBiomecanico(restriccion_overhead=True))
+        self.declare(Justificacion(regla="R06", motivo="Se establece perfil de restricción de empujes verticales (overhead)."))
 
     # =========================================================================
-    # REGLAS NUTRICIONALES Y RESTRICCIONES ALIMENTARIAS (Saliencia = 10)
+    # NIVEL 2: DEFINICIÓN DE ESTRATEGIA (Saliencia 70)
+    # Encadenamiento a partir de EvaluacionFisica y Usuario
     # =========================================================================
-    @Rule(
-        RestriccionNutricional(tipo='celiaquia'),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=10
-    )
-    def regla_nutricion_celiaquia(self):
-        self.declare(PrescripcionNutricional(
-            pauta="Exclusión estricta de TACC. Fuentes de carbos sugeridas: Arroz, papa, batata, mandioca, quinoa y avena certificada sin gluten."
-        ))
-        self.declare(Justificacion(
-            regla="R_NUT_CELIAQUIA",
-            motivo="Filtrado estricto de fuentes de carbohidratos para garantizar seguridad digestiva sin gluten."
-        ))
+    @Rule(Usuario(experiencia='principiante'), EvaluacionFisica(capacidad_recuperacion='baja'), NOT(AlertaSeguridad()), salience=70)
+    def r07_estr_principiante_baja(self):
+        self.declare(EsquemaBase(tipo='Fullbody', volumen='bajo_adaptativo'))
+        self.declare(Justificacion(regla="R07", motivo="Esquema base Fullbody de bajo volumen para principiantes con menor recuperación."))
 
-    @Rule(
-        RestriccionNutricional(tipo='vegetarianismo'),
-        NOT(AlertaSeguridad(tipo='bloqueo_preventivo')),
-        salience=10
-    )
-    def regla_nutricion_vegetariana(self):
-        self.declare(PrescripcionNutricional(
-            pauta="Complementación proteica obligatoria (combinar cereales y legumbres) o suplementación con proteína de suero / arveja y B12."
-        ))
-        self.declare(Justificacion(
-            regla="R_NUT_VEGETARIANO",
-            motivo="Garantizar perfil aminoacídico completo mediante combinaciones vegetales."
-        ))
-    
-    # (Completar con reglas adicionales hasta superar las 20 reglas parametrizadas y encadenadas)
+    @Rule(Usuario(experiencia='principiante'), EvaluacionFisica(capacidad_recuperacion='alta'), NOT(AlertaSeguridad()), salience=70)
+    def r08_estr_principiante_alta(self):
+        self.declare(EsquemaBase(tipo='Fullbody', volumen='moderado'))
+        self.declare(Justificacion(regla="R08", motivo="Esquema base Fullbody estándar para adaptación neuromuscular."))
+
+    @Rule(Usuario(experiencia='intermedio', objetivo='hipertrofia'), NOT(AlertaSeguridad()), salience=70)
+    def r09_estr_intermedio_hipertrofia(self):
+        self.declare(EsquemaBase(tipo='Torso/Pierna', volumen='moderado'))
+        self.declare(Justificacion(regla="R09", motivo="Esquema Torso/Pierna asignado por experiencia intermedia y objetivo de masa muscular."))
+
+    @Rule(Usuario(experiencia='avanzado', objetivo='hipertrofia', dias_disponibles=MATCH.d), TEST(lambda d: d >= 4), NOT(AlertaSeguridad()), salience=70)
+    def r10_estr_avanzado_hipertrofia(self, d):
+        self.declare(EsquemaBase(tipo='Push/Pull/Legs', volumen='alto'))
+        self.declare(Justificacion(regla="R10", motivo="Esquema avanzado dividido (Push/Pull/Legs) para maximizar volumen tolerado."))
+
+    @Rule(Usuario(objetivo='perdidagrasa'), NOT(AlertaSeguridad()), salience=70)
+    def r11_estr_nut_deficit(self):
+        self.declare(EstrategiaNutricional(enfoque='deficit_hipocalorico'))
+        self.declare(Justificacion(regla="R11", motivo="Estrategia nutricional seteada en déficit calórico para pérdida de grasa."))
+
+    @Rule(Usuario(objetivo='hipertrofia'), NOT(AlertaSeguridad()), salience=70)
+    def r12_estr_nut_superavit(self):
+        self.declare(EstrategiaNutricional(enfoque='superavit_hipercalorico'))
+        self.declare(Justificacion(regla="R12", motivo="Estrategia nutricional seteada en superávit para síntesis muscular."))
+
+    # =========================================================================
+    # NIVEL 3: PRESCRIPCIÓN FINAL ENTRENAMIENTO Y EXCLUSIONES (Saliencia 50)
+    # Encadenamiento a partir de EsquemaBase y PerfilBiomecanico
+    # =========================================================================
+    @Rule(EsquemaBase(tipo='Fullbody', volumen='bajo_adaptativo'), NOT(AlertaSeguridad()), salience=50)
+    def r13_pres_fb_bajo(self):
+        self.declare(PrescripcionEntrenamiento(esquema="Fullbody Adaptativo", series_por_grupo="2 series", repeticiones="12 a 15 reps", descanso="90 a 120 seg"))
+
+    @Rule(EsquemaBase(tipo='Fullbody', volumen='moderado'), NOT(AlertaSeguridad()), salience=50)
+    def r14_pres_fb_mod(self):
+        self.declare(PrescripcionEntrenamiento(esquema="Fullbody Estándar", series_por_grupo="3 series", repeticiones="10 a 12 reps", descanso="90 seg"))
+
+    @Rule(EsquemaBase(tipo='Torso/Pierna', volumen='moderado'), NOT(AlertaSeguridad()), salience=50)
+    def r15_pres_tp_mod(self):
+        self.declare(PrescripcionEntrenamiento(esquema="División Torso / Pierna", series_por_grupo="3 a 4 series", repeticiones="8 a 12 reps", descanso="90 a 120 seg"))
+
+    @Rule(EsquemaBase(tipo='Push/Pull/Legs', volumen='alto'), NOT(AlertaSeguridad()), salience=50)
+    def r16_pres_ppl_alto(self):
+        self.declare(PrescripcionEntrenamiento(esquema="Push / Pull / Legs", series_por_grupo="4 a 5 series", repeticiones="6 a 10 reps", descanso="120 seg"))
+
+    @Rule(PerfilBiomecanico(restriccion_axial=True), NOT(AlertaSeguridad()), salience=50)
+    def r17_pres_excl_axial(self):
+        self.declare(PrescripcionEntrenamiento(ejercicio_excluido="Sentadilla Libre con Barra / Peso Muerto Convencional", ejercicio_reemplazo="Prensa 45° / Sentadilla Búlgara / Hip Thrust"))
+        self.declare(Justificacion(regla="R17", motivo="Sustitución de cargas axiales compresivas debido a restricción biomecánica lumbar."))
+
+    @Rule(PerfilBiomecanico(restriccion_overhead=True), NOT(AlertaSeguridad()), salience=50)
+    def r18_pres_excl_overhead(self):
+        self.declare(PrescripcionEntrenamiento(ejercicio_excluido="Press Militar con Barra / Jalón Trasnuca", ejercicio_reemplazo="Press de Hombro Neutro con Mancuernas / Elevaciones Laterales"))
+        self.declare(Justificacion(regla="R18", motivo="Eliminación de empujes sobre la cabeza por restricción biomecánica de hombro."))
+
+    # =========================================================================
+    # NIVEL 3: PRESCRIPCIÓN FINAL NUTRICIONAL (Saliencia 50)
+    # Encadenamiento a partir de EstrategiaNutricional y Restricciones
+    # =========================================================================
+    @Rule(EstrategiaNutricional(enfoque='deficit_hipocalorico'), RestriccionNutricional(tipo='vegetarianismo'), NOT(AlertaSeguridad()), salience=50)
+    def r19_pres_nut_deficit_veg(self):
+        self.declare(PrescripcionNutricional(pauta="Déficit calórico vegetariano: Priorizar tofu, seitan, proteína aislada y fibras para saciedad con bajo aporte graso."))
+        self.declare(Justificacion(regla="R19", motivo="Ajuste de fuentes proteicas vegetales concentradas para lograr déficit sin perder masa magra."))
+
+    @Rule(EstrategiaNutricional(enfoque='superavit_hipercalorico'), RestriccionNutricional(tipo='celiaquia'), NOT(AlertaSeguridad()), salience=50)
+    def r20_pres_nut_sup_cel(self):
+        self.declare(PrescripcionNutricional(pauta="Superávit sin TACC: Aumentar carbohidratos mediante arroz, quinoa, batata y harina de maíz; evitar avena no certificada."))
+        self.declare(Justificacion(regla="R20", motivo="Selección de carbohidratos calóricamente densos libres de gluten para superávit."))
+
+    @Rule(EstrategiaNutricional(enfoque='deficit_hipocalorico'), NOT(RestriccionNutricional()), NOT(AlertaSeguridad()), salience=50)
+    def r21_pres_nut_deficit_std(self):
+        self.declare(PrescripcionNutricional(pauta="Priorizar proteína magra (pollo, huevos, pescados) y vegetales fibrosos. Reducir carbohidratos en comidas alejadas del entrenamiento."))
+        self.declare(Justificacion(regla="R21", motivo="Recomendación estándar de déficit para optimizar saciedad y rendimiento."))
