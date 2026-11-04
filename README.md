@@ -1,6 +1,12 @@
 # Asistente Experto en Entrenamiento y Nutrición
 
-**Materia:** Análisis de Datos II
+**Materia:** Análisis de Datos II  
+**Universidad de la Ciudad de Buenos Aires - 2026**
+
+* **Grupo Autor (Proveedor):** [Letra de tu Grupo]
+* **Grupo Cliente:** [Letra del Grupo par]
+
+---
 
 ## Descripción del Sistema
 Este proyecto es un sistema experto basado en reglas lógicas diseñado para la prescripción personalizada de rutinas de entrenamiento y pautas nutricionales. El motor de inferencia está desarrollado en Python utilizando la librería `experta` (basada en encadenamiento hacia adelante), y la interfaz gráfica está construida con `streamlit`.
@@ -11,7 +17,37 @@ El sistema evalúa el perfil biométrico, nivel de experiencia, disponibilidad h
 3. Asignar esquemas de entrenamiento biomecánicamente seguros (adaptando ejercicios si existen lesiones).
 4. Proveer justificaciones explicables para cada decisión tomada por el motor (Traza de inferencia).
 
-## Grilla de Reglas del Motor de Inferencia
+## Requisitos y Versión
+* **Python:** Versión 3.10 o superior (Requerido para la correcta ejecución del parche de compatibilidad de la librería Experta).
+
+## Instalación y Ejecución reproducibles
+
+1. **Clonar el repositorio y acceder a la carpeta:**
+   ```bash
+   git clone [URL_DE_TU_REPOSITORIO]
+   cd [NOMBRE_DE_LA_CARPETA]
+   ```
+
+2. **Instalar las dependencias fijadas:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Ejecutar la aplicación (Interfaz de Usuario):**
+   ```bash
+   streamlit run app.py
+   ```
+
+4. **Ejecutar Casos de Prueba (Validación del Cliente):**
+   *(Nota: Asegúrate de tener un script o notebook para esto según las pautas de la cátedra)*
+   Para verificar la salida del sistema con los casos de prueba del cliente, ejecutar:
+   ```bash
+   python [nombre_del_script_de_pruebas].py
+   # o abrir el notebook de validación.
+   ```
+
+## Grilla de Reglas del Motor de Inferencia (Base de Conocimiento)
+El sistema cuenta con más de 20 reglas organizadas en 3 niveles de encadenamiento (Diagnóstico > Estrategia > Prescripción):
 
 | ID Regla | Categoría | Condición (Antecedente) | Acción / Conclusión (Consecuente) |
 | :--- | :--- | :--- | :--- |
@@ -40,7 +76,3 @@ El sistema evalúa el perfil biométrico, nivel de experiencia, disponibilidad h
 | **R21** | Pauta Nutricional | Déficit + Sin restricciones | Pauta estándar para saciedad y retención de masa magra. |
 | **R22** | Pauta Nutricional | Superávit + Sin restricciones | Pauta estándar para maximizar rendimiento y síntesis muscular. |
 | **R23** | Pauta Nutricional | Mantenimiento | Pauta normocalórica para sostener rendimiento y masa actual. |
-
-## Instalación y Ejecución
-1. Instalar dependencias: `pip install -r requirements.txt`
-2. Ejecutar la aplicación: `streamlit run app.py`
